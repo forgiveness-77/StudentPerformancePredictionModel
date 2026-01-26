@@ -1,2 +1,2 @@
 .env/
-/performance/model.pkl
+student_ml/performance/model.pkl
