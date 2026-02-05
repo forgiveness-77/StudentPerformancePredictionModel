@@ -7,6 +7,7 @@ class StudentPerformance(models.Model):
     sleep_hours = models.IntegerField()
     sample_papers = models.IntegerField()
     performance_index = models.FloatField()
+    category = models.CharField(max_length=50, blank=True, null=True)
     
     def __str__(self):
         return f"Performance: {self.performance_index}"
