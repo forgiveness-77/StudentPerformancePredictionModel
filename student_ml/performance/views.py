@@ -73,7 +73,7 @@ def predict_performance(request):
     sleep_hours = data['sleep_hours']
     
     # Your existing special cases
-    if sleep_hours == 0:
+    if sleep_hours == 0 or hours_studied == 24:
         return Response({
             'category': 'Extreme Stress',
             'message': 'Student cannot take exam due to extreme stress',
@@ -118,3 +118,86 @@ def predict_performance(request):
         'predicted_performance_index': round(float(prediction), 2),
         'needs_intervention': False
     })
+    
+def student_form(request):
+    context = {}
+    if request.method == 'POST':
+        try:
+            hours_studied = float(request.POST.get('hours_studied', 0))
+        except ValueError:
+            hours_studied = 0
+
+        try:
+            sleep_hours = float(request.POST.get('sleep_hours', 0))
+        except ValueError:
+            sleep_hours = 0
+
+        try:
+            previous_scores = float(request.POST.get('previous_scores', 0))
+        except ValueError:
+            previous_scores = 0
+
+        extracurricular = True if request.POST.get('extracurricular') == 'on' else False
+
+        try:
+            sample_papers = int(request.POST.get('sample_papers', 0))
+        except ValueError:
+            sample_papers = 0
+
+        # Early special cases
+        if sleep_hours == 0 or hours_studied == 24:
+            context.update({
+                'category': 'Extreme Stress',
+                'message': "Student cannot take exam due to extreme stress",
+                'predicted_performance_index': None,
+                'needs_intervention': True,
+            })
+            context.update(request.POST)
+            return render(request, 'performance/index.html', context)
+
+        if sleep_hours == 24 or hours_studied == 0:
+            context.update({
+                'category': 'Not Studied',
+                'message': "Student did not study at all",
+                'predicted_performance_index': None,
+                'needs_intervention': True,
+            })
+            context.update(request.POST)
+            return render(request, 'performance/index.html', context)
+
+        category = get_student_category(hours_studied, sleep_hours)
+        needs_intervention = category in INTERVENTION_CATEGORIES
+
+        predicted = None
+        message = ''
+
+        if needs_intervention:
+            message = f'Student is {category}. Needs intervention before academic focus.'
+        else:
+            features = np.array([[
+                hours_studied,
+                previous_scores,
+                1 if extracurricular else 0,
+                sleep_hours,
+                sample_papers,
+            ]])
+            try:
+                prediction = model.predict(features)[0]
+                predicted = round(float(prediction), 2)
+                message = 'Performance predicted.'
+            except Exception as e:
+                message = f'Prediction error: {e}'
+
+        context.update({
+            'category': category,
+            'message': message,
+            'predicted_performance_index': predicted,
+            'needs_intervention': needs_intervention,
+            'hours_studied': hours_studied,
+            'sleep_hours': sleep_hours,
+            'previous_scores': previous_scores,
+            'extracurricular': extracurricular,
+            'sample_papers': sample_papers,
+        })
+
+    return render(request, 'performance/index.html', context)
